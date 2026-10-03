@@ -78,6 +78,79 @@ npm run dev
 La web de desarrollo queda en <http://localhost:5173> y hace proxy de la API a
 `http://127.0.0.1:8000`.
 
+## Despliegue en tu red local (LAN)
+
+Para dejar la aplicación corriendo en una computadora de la casa y verla desde
+cualquier dispositivo de la red (teléfono, laptop, TV…).
+
+### 1. Preparar la máquina
+
+- Deja la computadora encendida y, si puedes, conectada por cable.
+- Reserva su IP en el router (DHCP estático) para que la URL no cambie nunca.
+
+### 2. Abrir el puerto y arrancar
+
+**Windows** (PowerShell como Administrador, desde la raíz del repo):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy/lan-windows.ps1
+```
+
+El script abre el puerto 8000 solo para redes privadas, te muestra las URLs y
+levanta el servicio. Si prefieres hacerlo a mano:
+
+```powershell
+New-NetFirewallRule -DisplayName "estados-de-cuenta" -Direction Inbound `
+  -Protocol TCP -LocalPort 8000 -Action Allow -Profile Private
+docker compose up -d
+ipconfig   # busca "Dirección IPv4" de tu adaptador de red
+```
+
+**Linux:**
+
+```bash
+sudo ufw allow 8000/tcp        # o el firewall que uses
+docker compose up -d
+hostname -I                    # IP de la máquina
+```
+
+Desde cualquier equipo de la red entra a: `http://IP-DE-LA-MAQUINA:8000`
+
+### 3. Que arranque solo al encender la máquina
+
+El `docker-compose.yml` ya trae `restart: unless-stopped`: el contenedor vuelve
+solo cada vez que el motor de Docker arranca.
+
+**Windows con Docker Desktop**
+
+1. Docker Desktop → **Settings → General** → activa *Start Docker Desktop when
+   you sign in*.
+2. Si nadie inicia sesión en esa máquina, activa el inicio de sesión automático
+   (`netplwiz`) o crea una tarea programada **Al iniciar el equipo** que ejecute
+   `"C:\Program Files\Docker\Docker\Docker Desktop.exe"`.
+3. Listo: al encender, Docker arranca y el contenedor se levanta solo.
+
+**Linux**
+
+```bash
+sudo systemctl enable --now docker
+cd estados-de-cuenta && docker compose up -d
+```
+
+### 4. Actualizar cuando haya cambios
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+### Seguridad
+
+La aplicación no tiene autenticación: está pensada para tu red privada. No la
+expongas directamente a internet. Si necesitas entrar desde fuera de casa, usa
+una VPN (WireGuard, Tailscale) o colócala detrás de un proxy con autenticación.
+Todos los datos viven en `data/`; respaldar = copiar esa carpeta.
+
 ## Línea de comandos
 
 ```bash
