@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/api.ts","./src/format.ts","./src/main.tsx","./src/types.ts","./src/components/charts.tsx","./src/components/stamp.tsx","./src/components/toast.tsx","./src/components/upload.tsx","./src/pages/dashboard.tsx","./src/pages/movements.tsx","./src/pages/settings.tsx","./src/pages/statementdetail.tsx","./src/pages/statementspage.tsx"],"version":"5.9.3"}

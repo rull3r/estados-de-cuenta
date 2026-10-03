@@ -1,0 +1,12 @@
+services:
+  app:
+    build: .
+    image: estados-de-cuenta:0.1.0
+    container_name: estados-de-cuenta
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+    environment:
+      EDC_MAX_UPLOAD_MB: "200"
+    restart: unless-stopped

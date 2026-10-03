@@ -1,0 +1,41 @@
+# Datos personales: NUNCA subir estados de cuenta ni bases de datos
+*.pdf
+*.PDF
+!demo/estado-sintetico-demo.pdf
+data/
+uploads/
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Entornos y cachés
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+node_modules/
+dist/
+build/
+*.egg-info/
+.coverage
+coverage.xml
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Editores / sistema
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Herramientas locales de desarrollo
+.agents/
+skills-lock.json
