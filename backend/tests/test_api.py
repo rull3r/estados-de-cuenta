@@ -120,6 +120,38 @@ def test_rechaza_pdf_que_no_es_estado_de_cuenta():
     assert "Mercantil" in response.json()["detail"]
 
 
+def test_reintento_de_archivo_con_error(tmp_path):
+    from app.db import SessionLocal
+    from app.models import Statement
+
+    path = make_statement(tmp_path / "reintento.pdf")
+    with path.open("rb") as handle:
+        response = client.post(
+            "/api/statements", files={"file": ("reintento.pdf", handle, "application/pdf")}
+        )
+    statement_id = response.json()["id"]
+
+    # Simula que el primer intento falló (p. ej. "database is locked")
+    session = SessionLocal()
+    statement = session.get(Statement, statement_id)
+    assert statement is not None
+    statement.status = "error"
+    statement.error = "database is locked (simulado)"
+    session.commit()
+    session.close()
+
+    with path.open("rb") as handle:
+        retry = client.post(
+            "/api/statements", files={"file": ("reintento.pdf", handle, "application/pdf")}
+        )
+    assert retry.status_code == 201
+    assert retry.json()["id"] == statement_id
+
+    detail = client.get(f"/api/statements/{statement_id}").json()
+    assert detail["status"] == "CUADRA"
+    assert detail["error"] is None
+
+
 def test_detecta_operaciones_repetidas_entre_estados(tmp_path):
     first = make_statement(tmp_path / "periodo_a.pdf")
     second = make_statement(tmp_path / "periodo_b.pdf", missing_debit=1.0)

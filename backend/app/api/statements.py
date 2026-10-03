@@ -64,15 +64,31 @@ async def upload_statement(
         )
 
     digest = hashlib.sha256(content).hexdigest()
-    existing = session.scalar(select(Statement).where(Statement.file_hash == digest))
-    if existing is not None:
-        raise HTTPException(
-            status_code=409,
-            detail={"message": "Este archivo ya fue cargado", "statement_id": existing.id},
-        )
-
     config.ensure_dirs()
     path = config.UPLOAD_DIR / f"{digest}.pdf"
+
+    existing = session.scalar(select(Statement).where(Statement.file_hash == digest))
+    if existing is not None:
+        # Si el intento anterior falló, permitir reprocesar el mismo archivo.
+        if existing.status == "error":
+            path.write_bytes(content)
+            existing.status = "procesando"
+            existing.error = None
+            existing.file_name = file_name
+            existing.source_path = str(path)
+            session.commit()
+            background.add_task(process_statement, existing.id, str(path))
+            return statement_to_dict(existing)
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Este archivo ya fue cargado"
+                if existing.status != "procesando"
+                else "Este archivo se está procesando",
+                "statement_id": existing.id,
+            },
+        )
+
     path.write_bytes(content)
 
     statement = Statement(
