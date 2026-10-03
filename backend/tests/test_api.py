@@ -1,3 +1,4 @@
+import fitz
 import pytest
 from fastapi.testclient import TestClient
 
@@ -6,6 +7,14 @@ from app.main import app
 from tests.synth import make_statement
 
 client = TestClient(app)
+
+
+def _pdf_en_blanco() -> bytes:
+    doc = fitz.open()
+    doc.new_page(width=200, height=200)
+    data = doc.tobytes()
+    doc.close()
+    return data
 
 
 def test_health():
@@ -91,3 +100,45 @@ def test_ajustes_manuales(tmp_path):
     assert len(detail["adjustments"]) == 1
     summary = client.get("/api/stats/summary").json()
     assert summary["adjustments"]["cargo"] == 123.45
+
+
+def test_rechaza_archivo_que_no_es_pdf():
+    response = client.post(
+        "/api/statements",
+        files={"file": ("notas.pdf", b"esto no es un pdf", "application/pdf")},
+    )
+    assert response.status_code == 400
+    assert "PDF" in response.json()["detail"]
+
+
+def test_rechaza_pdf_que_no_es_estado_de_cuenta():
+    response = client.post(
+        "/api/statements",
+        files={"file": ("otro.pdf", _pdf_en_blanco(), "application/pdf")},
+    )
+    assert response.status_code == 422
+    assert "Mercantil" in response.json()["detail"]
+
+
+def test_detecta_operaciones_repetidas_entre_estados(tmp_path):
+    first = make_statement(tmp_path / "periodo_a.pdf")
+    second = make_statement(tmp_path / "periodo_b.pdf", missing_debit=1.0)
+    for path in (first, second):
+        with path.open("rb") as handle:
+            response = client.post(
+                "/api/statements",
+                files={"file": (path.name, handle, "application/pdf")},
+            )
+        assert response.status_code == 201
+    second_id = response.json()["id"]
+
+    duplicates = client.get("/api/stats/duplicates").json()
+    assert duplicates, "debería detectar operaciones presentes en dos estados"
+    group = duplicates[0]
+    assert group["statement_count"] >= 2
+    assert len(group["operations"]) >= 2
+    assert all("statement_file" in operation for operation in group["operations"])
+
+    detail = client.get(f"/api/statements/{second_id}").json()
+    warnings = [issue for issue in detail["issues"] if issue["kind"] == "advertencia"]
+    assert any("solapa" in issue["detail"] for issue in warnings)

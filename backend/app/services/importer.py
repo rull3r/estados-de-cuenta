@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from dataclasses import asdict
 from datetime import date as date_cls
 
@@ -37,6 +38,23 @@ class DuplicateStatementError(RuntimeError):
     def __init__(self, statement_id: int) -> None:
         super().__init__("El archivo ya fue cargado")
         self.statement_id = statement_id
+
+
+# SQLite admite un solo escritor a la vez: los procesamientos se serializan para
+# que subir varios PDFs en ráfaga nunca produzca "database is locked".
+_PROCESS_LOCK = threading.Lock()
+
+
+def _period_iso(period: str | None) -> date_cls | None:
+    """Convierte un período dd-mm-yy a fecha ISO."""
+    if not period:
+        return None
+    try:
+        day, month, year = period.split("-")
+        full_year = int(year) + (2000 if int(year) < 100 else 0)
+        return date_cls(full_year, int(month), int(day))
+    except ValueError:
+        return None
 
 
 def _period_month(period_start: str | None, period_end: str | None) -> tuple[int, int]:
@@ -172,6 +190,33 @@ def persist_parse(session: Session, statement: Statement, result: ParseResult) -
     statement.pages = result.pages
     statement.status = report.status
     statement.error = None
+
+    # Aviso si el período se solapa con otro estado ya cargado de la misma cuenta
+    start = _period_iso(statement.period_start)
+    end = _period_iso(statement.period_end)
+    if start and end and statement.account_number:
+        others = session.scalars(
+            select(Statement).where(
+                Statement.id != statement.id,
+                Statement.account_number == statement.account_number,
+            )
+        ).all()
+        for other in others:
+            other_start = _period_iso(other.period_start)
+            other_end = _period_iso(other.period_end)
+            if other_start and other_end and start <= other_end and other_start <= end:
+                session.add(
+                    Issue(
+                        statement_id=statement.id,
+                        kind="advertencia",
+                        detail=(
+                            f"El período se solapa con «{other.file_name}» "
+                            f"({other.period_start} a {other.period_end}); "
+                            "puede haber operaciones repetidas entre ambos."
+                        ),
+                    )
+                )
+
     statement.report_json = json.dumps(
         {
             "status": report.status,
@@ -194,25 +239,30 @@ def persist_parse(session: Session, statement: Statement, result: ParseResult) -
 
 
 def process_statement(statement_id: int, path: str) -> None:
-    """Tarea de fondo: parsea el PDF y llena la base de datos."""
-    session = SessionLocal()
-    try:
-        statement = session.get(Statement, statement_id)
-        if statement is None:
-            return
+    """Tarea de fondo: parsea el PDF y llena la base de datos.
+
+    Se serializa con un lock porque SQLite admite un solo escritor a la vez; así
+    subir varios estados de cuenta en ráfaga no produce «database is locked».
+    """
+    with _PROCESS_LOCK:
+        session = SessionLocal()
         try:
-            result = parse_file(path)
-            persist_parse(session, statement, result)
-            session.commit()
-        except Exception as error:  # noqa: BLE001
-            session.rollback()
             statement = session.get(Statement, statement_id)
-            if statement is not None:
-                statement.status = "error"
-                statement.error = str(error)
+            if statement is None:
+                return
+            try:
+                result = parse_file(path)
+                persist_parse(session, statement, result)
                 session.commit()
-    finally:
-        session.close()
+            except Exception as error:  # noqa: BLE001
+                session.rollback()
+                statement = session.get(Statement, statement_id)
+                if statement is not None:
+                    statement.status = "error"
+                    statement.error = str(error)
+                    session.commit()
+        finally:
+            session.close()
 
 
 def statement_to_dict(statement: Statement, *, detail: bool = False) -> dict:

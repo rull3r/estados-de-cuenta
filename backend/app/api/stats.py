@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from ..db import get_session
-from ..services.stats import biggest_operations, summary
+from ..services.stats import biggest_operations, find_duplicates, summary
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])
 
@@ -26,3 +26,12 @@ def get_biggest(
     session: Session = Depends(get_session),
 ) -> list[dict]:
     return biggest_operations(session, statement_id, limit)
+
+
+@router.get("/duplicates")
+def get_duplicates(
+    limit: int = Query(50, ge=1, le=200),
+    session: Session = Depends(get_session),
+) -> list[dict]:
+    """Operaciones que aparecen en más de un estado de cuenta (posibles repetidas)."""
+    return find_duplicates(session, limit)

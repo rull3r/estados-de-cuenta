@@ -1,5 +1,6 @@
 import type {
   Bank,
+  DuplicateGroup,
   OperationPage,
   Rule,
   Statement,
@@ -56,6 +57,7 @@ export const api = {
     request<import("./types").Operation[]>(
       `/api/stats/biggest${statementId ? `?statement_id=${statementId}` : ""}`,
     ),
+  duplicates: () => request<DuplicateGroup[]>("/api/stats/duplicates"),
   rules: () => request<Rule[]>("/api/rules"),
   createRule: (payload: { pattern: string; category: string; priority: number }) =>
     request<Rule>("/api/rules", {

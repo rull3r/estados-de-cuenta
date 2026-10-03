@@ -32,8 +32,8 @@ export default function StatementsPage() {
   return (
     <>
       <div className="panel">
-        <h2 className="panel-title">subir estado de cuenta</h2>
-        <Upload onUploaded={() => void load()} />
+        <h2 className="panel-title">subir estados de cuenta</h2>
+        <Upload onFinished={() => void load()} />
       </div>
 
       <div className="panel">

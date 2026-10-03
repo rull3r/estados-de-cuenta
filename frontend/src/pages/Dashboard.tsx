@@ -5,7 +5,7 @@ import { Bars, Sparkline } from "../components/Charts";
 import { Upload } from "../components/Upload";
 import { useToast } from "../components/Toast";
 import { STATUS_LABEL, dateLabel, money, moneyShort, methodLabel, statusClass } from "../format";
-import type { Operation, Statement, Summary } from "../types";
+import type { DuplicateGroup, Operation, Statement, Summary } from "../types";
 
 function monthShort(period: string | null): string {
   if (!period) return "—";
@@ -19,20 +19,23 @@ export default function Dashboard() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [statements, setStatements] = useState<Statement[]>([]);
   const [biggest, setBiggest] = useState<Operation[]>([]);
+  const [duplicates, setDuplicates] = useState<DuplicateGroup[]>([]);
   const [scope, setScope] = useState<string>("all");
   const notify = useToast();
 
   const load = useCallback(async () => {
     try {
       const statementId = scope === "all" ? undefined : Number(scope);
-      const [nextSummary, nextStatements, nextBiggest] = await Promise.all([
+      const [nextSummary, nextStatements, nextBiggest, nextDuplicates] = await Promise.all([
         api.summary(statementId),
         api.statements(),
         api.biggest(statementId),
+        api.duplicates(),
       ]);
       setSummary(nextSummary);
       setStatements(nextStatements);
       setBiggest(nextBiggest);
+      setDuplicates(nextDuplicates);
     } catch (error) {
       notify(error instanceof Error ? error.message : "No se pudieron cargar los datos", "error");
     }
@@ -41,28 +44,6 @@ export default function Dashboard() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  function pollStatement(id: number) {
-    const timer = window.setInterval(async () => {
-      try {
-        const statement = await api.statement(id);
-        if (statement.status !== "procesando") {
-          window.clearInterval(timer);
-          await load();
-          if (statement.status === "CUADRA") {
-            notify(`Conciliación perfecta: ${statement.file_name} cuadra al céntimo.`);
-          } else if (statement.status === "error") {
-            notify(`Error al procesar ${statement.file_name}: ${statement.error}`, "error");
-          } else {
-            notify(`${statement.file_name}: ${STATUS_LABEL[statement.status] ?? statement.status}.`);
-          }
-        }
-      } catch {
-        window.clearInterval(timer);
-      }
-    }, 2500);
-    window.setTimeout(() => window.clearInterval(timer), 10 * 60 * 1000);
-  }
 
   const processing = statements.some((statement) => statement.status === "procesando");
   useEffect(() => {
@@ -74,13 +55,8 @@ export default function Dashboard() {
   return (
     <>
       <div className="panel">
-        <h2 className="panel-title">subir estado de cuenta</h2>
-        <Upload
-          onUploaded={(id) => {
-            pollStatement(id);
-            void load();
-          }}
-        />
+        <h2 className="panel-title">subir estados de cuenta</h2>
+        <Upload onFinished={() => void load()} />
       </div>
 
       <div className="panel">
@@ -194,6 +170,52 @@ export default function Dashboard() {
             emptyText="Sin abonos con contraparte identificada."
           />
         </div>
+      </div>
+
+      <div className="panel">
+        <h2 className="panel-title">
+          operaciones repetidas entre estados {duplicates.length ? `· ${duplicates.length}` : ""}
+        </h2>
+        {duplicates.length === 0 ? (
+          <p className="muted">
+            Sin repetidas detectadas. Si dos estados comparten período, o el banco repite una operación del
+            mes anterior, aparecerá aquí con los archivos donde está.
+          </p>
+        ) : (
+          <div className="table-wrap" style={{ maxHeight: 320 }}>
+            <table className="grid-table">
+              <thead>
+                <tr>
+                  <th>fecha</th>
+                  <th className="num">monto</th>
+                  <th>sentido</th>
+                  <th>referencia</th>
+                  <th className="num">estados</th>
+                  <th>dónde aparece</th>
+                </tr>
+              </thead>
+              <tbody>
+                {duplicates.map((group, index) => (
+                  <tr key={`${group.date_iso}-${group.amount}-${index}`}>
+                    <td className="mono">{dateLabel(group.date_iso)}</td>
+                    <td className="num">{money(group.amount)}</td>
+                    <td>{group.direction === "abono" ? "abono" : "cargo"}</td>
+                    <td>{group.reference ?? (group.counterpart_account ? `***${group.counterpart_account}` : "—")}</td>
+                    <td className="num">{group.statement_count}</td>
+                    <td className="desc">
+                      {group.operations
+                        .map(
+                          (operation) =>
+                            `${operation.statement_file}: ${operation.description.slice(0, 55)}`,
+                        )
+                        .join(" · ")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="grid-2">

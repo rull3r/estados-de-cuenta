@@ -149,3 +149,23 @@ export interface Bank {
   name: string;
   status: string;
 }
+
+export interface DuplicateOperation {
+  id: number;
+  statement_id: number;
+  statement_file: string;
+  date: string;
+  description: string;
+  counterpart: string | null;
+}
+
+export interface DuplicateGroup {
+  amount: number;
+  date_iso: string | null;
+  direction: "cargo" | "abono";
+  reference: string | null;
+  counterpart_account: string | null;
+  count: number;
+  statement_count: number;
+  operations: DuplicateOperation[];
+}

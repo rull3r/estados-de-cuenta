@@ -135,3 +135,71 @@ def biggest_operations(session: Session, statement_id: int | None = None, limit:
         }
         for op in rows
     ]
+
+
+def find_duplicates(session: Session, limit: int = 50) -> list[dict]:
+    """Operaciones que aparecen en más de un estado de cuenta.
+
+    Se consideran repetidas si comparten monto, fecha, sentido y la misma
+    referencia o cuenta de contraparte (los períodos de Mercantil pueden solaparse
+    y traer operaciones del mes anterior).
+    """
+    key_columns = (
+        Operation.amount,
+        Operation.date_iso,
+        Operation.direction,
+        func.coalesce(Operation.reference, ""),
+        func.coalesce(Operation.counterpart_account, ""),
+    )
+    groups = session.execute(
+        select(
+            *key_columns,
+            func.count(Operation.id),
+            func.count(func.distinct(Operation.statement_id)),
+        )
+        .group_by(*key_columns)
+        .having(func.count(func.distinct(Operation.statement_id)) > 1)
+        .order_by(
+            func.count(func.distinct(Operation.statement_id)).desc(),
+            func.count(Operation.id).desc(),
+        )
+        .limit(limit)
+    ).all()
+
+    results: list[dict] = []
+    for amount, date_iso, direction, reference, account, count, statement_count in groups:
+        rows = session.execute(
+            select(Operation, Statement.file_name)
+            .join(Statement, Operation.statement_id == Statement.id)
+            .where(
+                Operation.amount == amount,
+                Operation.date_iso == date_iso,
+                Operation.direction == direction,
+                func.coalesce(Operation.reference, "") == reference,
+                func.coalesce(Operation.counterpart_account, "") == account,
+            )
+            .order_by(Operation.statement_id, Operation.seq)
+        ).all()
+        results.append(
+            {
+                "amount": amount,
+                "date_iso": date_iso.isoformat() if date_iso else None,
+                "direction": direction,
+                "reference": reference or None,
+                "counterpart_account": account or None,
+                "count": count,
+                "statement_count": statement_count,
+                "operations": [
+                    {
+                        "id": operation.id,
+                        "statement_id": operation.statement_id,
+                        "statement_file": file_name,
+                        "date": operation.date,
+                        "description": operation.description,
+                        "counterpart": operation.counterpart,
+                    }
+                    for operation, file_name in rows
+                ],
+            }
+        )
+    return results

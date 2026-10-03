@@ -570,6 +570,56 @@ table.grid-table {
   margin-top: 6px;
 }
 
+.queue {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+}
+
+.queue-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+
+.queue-item {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.6fr) 150px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+}
+
+.queue-item:last-child {
+  border-bottom: none;
+}
+
+.queue-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-msg {
+  color: var(--danger);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .queue-item {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
 /* ---------- barras y gráficas ---------- */
 
 .bars {

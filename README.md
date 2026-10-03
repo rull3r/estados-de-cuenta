@@ -28,6 +28,14 @@ Esta herramienta fue construida y validada contra **42 estados de cuenta reales
 - **Lectura completa del PDF**: libro principal (`MOVIMIENTOS DE CUENTA`), anexo
   `MERCANTIL EN LINEA` y `PUNTOS DE VENTA`, reconstruyendo descripciones partidas
   entre columnas y páginas.
+- **Carga por lotes**: suelta o selecciona varios PDFs a la vez; se procesan en
+  cola uno por uno, con estado por archivo (al céntimo / con diferencias /
+  duplicado / error) y sin bloquear la base de datos.
+- **Control de archivos**: rechaza lo que no sea PDF o no sea un estado de cuenta
+  soportado, y avisa si el archivo ya fue cargado (hash).
+- **Detección de operaciones repetidas**: encuentra movimientos que aparecen en
+  más de un estado de cuenta (períodos solapados o repetidos del mes anterior) y
+  avisa al cargar un estado cuyo período se solapa con otro.
 - **Conciliación automática** en cuatro niveles: totales del resumen, saldo
   inicio/final, saldos intermedios impresos y cruce de anexos.
 - **Detección de filas omitidas por el banco**: localiza el tramo de páginas y el

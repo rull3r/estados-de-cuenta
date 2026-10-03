@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 
+import fitz
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -13,6 +14,7 @@ from sqlalchemy.orm import Session
 from .. import config
 from ..db import get_session
 from ..models import Adjustment, Statement
+from ..parsers.base import get_adapters
 from ..schemas import AdjustmentIn
 from ..services.importer import process_statement, statement_to_dict
 
@@ -39,6 +41,27 @@ async def upload_statement(
     content = await file.read()
     if len(content) > config.MAX_UPLOAD_MB * 1024 * 1024:
         raise HTTPException(status_code=413, detail=f"El archivo supera {config.MAX_UPLOAD_MB} MB")
+
+    # Validación temprana: que sea un PDF y que el banco sea reconocido.
+    if not content.startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="El archivo no es un PDF válido")
+    try:
+        with fitz.open(stream=content, filetype="pdf") as probe:
+            if probe.needs_pass:
+                raise HTTPException(status_code=400, detail="El PDF está protegido con contraseña")
+            recognized = any(adapter.detect(probe) for adapter in get_adapters())
+    except HTTPException:
+        raise
+    except Exception as error:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"No se pudo abrir el PDF: {error}") from error
+    if not recognized:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "El PDF no parece un estado de cuenta soportado. "
+                "Por ahora se aceptan estados de cuenta de Mercantil (Cuenta Corriente)."
+            ),
+        )
 
     digest = hashlib.sha256(content).hexdigest()
     existing = session.scalar(select(Statement).where(Statement.file_hash == digest))
