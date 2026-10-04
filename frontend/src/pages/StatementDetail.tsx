@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import { Stamp } from "../components/Stamp";
 import { useToast } from "../components/Toast";
-import { STATUS_LABEL, money, statusClass } from "../format";
+import { STATUS_LABEL, money, progressLabel, statusClass } from "../format";
 import type { Statement } from "../types";
 
 function CheckLine({
@@ -141,7 +141,18 @@ export default function StatementDetail() {
 
       {statement.status === "procesando" && (
         <div className="panel">
-          <p className="muted">Leyendo el PDF y conciliando contra el resumen oficial…</p>
+          <h2 className="panel-title">procesando</h2>
+          <div className="progress">
+            <div className="progress-fill" style={{ width: `${statement.progress_percent}%` }} />
+          </div>
+          <p className="muted" style={{ marginTop: 8 }}>
+            {progressLabel(
+              statement.progress_stage,
+              statement.progress_percent,
+              statement.started_at,
+              statement.queue_position,
+            )}
+          </p>
         </div>
       )}
 

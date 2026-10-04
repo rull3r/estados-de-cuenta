@@ -37,6 +37,26 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False
 
 def init_db() -> None:
     Base.metadata.create_all(engine)
+    _migrate()
+
+
+def _migrate() -> None:
+    """Agrega columnas nuevas a bases de datos creadas con versiones anteriores."""
+    additions = (
+        ("progress_stage", "ALTER TABLE statements ADD COLUMN progress_stage VARCHAR(60) DEFAULT 'en cola'"),
+        ("progress_percent", "ALTER TABLE statements ADD COLUMN progress_percent INTEGER DEFAULT 0"),
+        ("started_at", "ALTER TABLE statements ADD COLUMN started_at DATETIME"),
+        ("finished_at", "ALTER TABLE statements ADD COLUMN finished_at DATETIME"),
+    )
+    with engine.begin() as connection:
+        columns = {row[1] for row in connection.exec_driver_sql("PRAGMA table_info(statements)")}
+        for name, ddl in additions:
+            if name not in columns:
+                connection.exec_driver_sql(ddl)
+        connection.exec_driver_sql(
+            "UPDATE statements SET progress_percent = 100, progress_stage = 'listo' "
+            "WHERE status != 'procesando' AND progress_percent = 0"
+        )
 
 
 def get_session() -> Iterator[Session]:

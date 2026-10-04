@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from dataclasses import asdict
 from datetime import date as date_cls
+from datetime import datetime
 from pathlib import Path
 
 from sqlalchemy import delete, select
@@ -239,11 +241,18 @@ def persist_parse(session: Session, statement: Statement, result: ParseResult) -
     )
 
 
+def _set_progress(session: Session, statement: Statement, stage: str, percent: int) -> None:
+    statement.progress_stage = stage
+    statement.progress_percent = percent
+    session.commit()
+
+
 def process_statement(statement_id: int, path: str) -> None:
     """Tarea de fondo: parsea el PDF y llena la base de datos.
 
     Se serializa con un lock porque SQLite admite un solo escritor a la vez; así
     subir varios estados de cuenta en ráfaga no produce «database is locked».
+    Reporta el avance (etapa, porcentaje y página) para que la web lo muestre.
     """
     with _PROCESS_LOCK:
         session = SessionLocal()
@@ -252,8 +261,28 @@ def process_statement(statement_id: int, path: str) -> None:
             if statement is None:
                 return
             try:
-                result = parse_file(path)
+                statement.started_at = datetime.utcnow()
+                _set_progress(session, statement, "abriendo PDF", 2)
+
+                last_update = [0.0]
+
+                def on_page(page: int, total: int) -> None:
+                    now = time.monotonic()
+                    if page < total and now - last_update[0] < 0.8:
+                        return
+                    last_update[0] = now
+                    percent = 3 + int(84 * page / max(total, 1))
+                    _set_progress(session, statement, f"leyendo páginas ({page}/{total})", percent)
+
+                result = parse_file(path, progress_callback=on_page)
+                _set_progress(session, statement, "conciliando contra el resumen", 90)
                 persist_parse(session, statement, result)
+                statement.progress_stage = "guardando en la base"
+                statement.progress_percent = 96
+                session.commit()
+                statement.progress_stage = "listo"
+                statement.progress_percent = 100
+                statement.finished_at = datetime.utcnow()
                 session.commit()
             except Exception as error:  # noqa: BLE001
                 session.rollback()
@@ -261,6 +290,8 @@ def process_statement(statement_id: int, path: str) -> None:
                 if statement is not None:
                     statement.status = "error"
                     statement.error = str(error)
+                    statement.progress_stage = "error"
+                    statement.finished_at = datetime.utcnow()
                     session.commit()
         finally:
             session.close()
@@ -280,6 +311,9 @@ def recover_interrupted() -> int:
         for statement in stale:
             path = statement.source_path
             if path and Path(path).exists():
+                statement.progress_stage = "en cola"
+                statement.progress_percent = 0
+                statement.started_at = None
                 threading.Thread(
                     target=process_statement,
                     args=(statement.id, path),
@@ -293,13 +327,16 @@ def recover_interrupted() -> int:
                     "El procesamiento se interrumpió (reinicio) y no se encontró el archivo; "
                     "vuelve a subirlo."
                 )
+                statement.progress_stage = "error"
         session.commit()
     finally:
         session.close()
     return recovered
 
 
-def statement_to_dict(statement: Statement, *, detail: bool = False) -> dict:
+def statement_to_dict(
+    statement: Statement, *, detail: bool = False, queue_position: int | None = None
+) -> dict:
     payload = {
         "id": statement.id,
         "bank": statement.bank,
@@ -308,6 +345,11 @@ def statement_to_dict(statement: Statement, *, detail: bool = False) -> dict:
         "uploaded_at": statement.uploaded_at.isoformat(),
         "status": statement.status,
         "error": statement.error,
+        "progress_stage": statement.progress_stage,
+        "progress_percent": statement.progress_percent,
+        "started_at": statement.started_at.isoformat() if statement.started_at else None,
+        "finished_at": statement.finished_at.isoformat() if statement.finished_at else None,
+        "queue_position": queue_position,
         "holder": statement.holder,
         "account_number": statement.account_number,
         "period_start": statement.period_start,

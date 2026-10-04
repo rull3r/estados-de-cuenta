@@ -43,6 +43,10 @@ def _requeue(session: Session, statement: Statement, file_name: str, path: Path,
     statement.file_name = file_name
     statement.source_path = str(path)
     statement.uploaded_at = datetime.utcnow()
+    statement.progress_stage = "en cola"
+    statement.progress_percent = 0
+    statement.started_at = None
+    statement.finished_at = None
     session.commit()
     return statement_to_dict(statement)
 
@@ -123,7 +127,19 @@ def list_statements(session: Session = Depends(get_session)) -> list[dict]:
     statements = session.scalars(
         select(Statement).order_by(Statement.period_start.desc(), Statement.id.desc())
     ).all()
-    return [statement_to_dict(statement) for statement in statements]
+    waiting = sorted(
+        [
+            statement
+            for statement in statements
+            if statement.status == "procesando" and (statement.progress_percent or 0) <= 0
+        ],
+        key=lambda statement: (statement.uploaded_at, statement.id),
+    )
+    positions = {statement.id: index + 1 for index, statement in enumerate(waiting)}
+    return [
+        statement_to_dict(statement, queue_position=positions.get(statement.id))
+        for statement in statements
+    ]
 
 
 @router.post("/reprocess-all")
@@ -136,6 +152,10 @@ def reprocess_all(background: BackgroundTasks, session: Session = Depends(get_se
         if statement.source_path and Path(statement.source_path).exists():
             statement.status = "procesando"
             statement.error = None
+            statement.progress_stage = "en cola"
+            statement.progress_percent = 0
+            statement.started_at = None
+            statement.finished_at = None
             queued.append(statement)
         else:
             skipped += 1
@@ -224,6 +244,10 @@ def reprocess_statement(
         return statement_to_dict(statement)
     statement.status = "procesando"
     statement.error = None
+    statement.progress_stage = "en cola"
+    statement.progress_percent = 0
+    statement.started_at = None
+    statement.finished_at = None
     session.commit()
     background.add_task(process_statement, statement.id, statement.source_path)
     return statement_to_dict(statement)

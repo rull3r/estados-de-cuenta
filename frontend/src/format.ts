@@ -57,3 +57,34 @@ export function statusClass(status: string): string {
   if (status === "error") return "diff";
   return "review";
 }
+
+function parseUtc(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const value = iso.endsWith("Z") ? iso : `${iso}Z`;
+  const time = Date.parse(value);
+  return Number.isNaN(time) ? null : time;
+}
+
+export function etaLabel(startedAt: string | null | undefined, percent: number): string {
+  const start = parseUtc(startedAt);
+  if (start === null || percent < 5 || percent >= 100) return "";
+  const elapsed = (Date.now() - start) / 1000;
+  if (elapsed <= 0) return "";
+  const remaining = Math.max(0, Math.round((elapsed * (100 - percent)) / percent));
+  if (remaining < 60) return `~${remaining}s restantes`;
+  const minutes = Math.floor(remaining / 60);
+  const seconds = remaining % 60;
+  return `~${minutes}m ${seconds}s restantes`;
+}
+
+export function progressLabel(
+  stage: string | null | undefined,
+  percent: number,
+  startedAt: string | null | undefined,
+  queuePosition?: number | null,
+): string {
+  if (queuePosition) return `en cola · posición ${queuePosition}`;
+  const eta = etaLabel(startedAt, percent);
+  const base = `${stage ?? "procesando"} · ${percent}%`;
+  return eta ? `${base} · ${eta}` : base;
+}

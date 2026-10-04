@@ -31,6 +31,9 @@ Esta herramienta fue construida y validada contra **42 estados de cuenta reales
 - **Carga por lotes**: suelta o selecciona varios PDFs a la vez; se procesan en
   cola uno por uno, con estado por archivo (al céntimo / con diferencias /
   duplicado / error) y sin bloquear la base de datos.
+- **Progreso en vivo**: cada archivo muestra la etapa (abriendo PDF, leyendo
+  páginas X/Y, conciliando, guardando), el porcentaje, la posición en la cola y
+  el tiempo estimado restante; también al reprocesar.
 - **Recuperación automática**: si el servidor se reinicia a mitad de un
   procesamiento, al arrancar reencola solo los estados pendientes; y re-subir un
   archivo que falló lo reprocesa.

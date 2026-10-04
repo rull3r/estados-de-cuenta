@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 
@@ -16,6 +17,8 @@ try:  # pragma: no cover - depende de la versión de PyMuPDF
 except Exception:  # noqa: BLE001
     pass
 
+ProgressCallback = Callable[[int, int], None]
+
 
 class BankAdapter(Protocol):
     """Contrato que implementa cada banco."""
@@ -25,7 +28,7 @@ class BankAdapter(Protocol):
 
     def detect(self, doc: fitz.Document) -> bool: ...
 
-    def parse(self, path: str | Path) -> ParseResult: ...
+    def parse(self, path: str | Path, progress_callback: ProgressCallback | None = None) -> ParseResult: ...
 
 
 class UnsupportedBankError(RuntimeError):
@@ -46,13 +49,16 @@ def get_adapters() -> list[BankAdapter]:
     return [MercantilCorrienteAdapter()]
 
 
-def parse_file(path: str | Path) -> ParseResult:
-    """Detecta el banco y parsea el estado de cuenta."""
+def parse_file(path: str | Path, progress_callback: ProgressCallback | None = None) -> ParseResult:
+    """Detecta el banco y parsea el estado de cuenta.
+
+    ``progress_callback(página, total)`` se invoca por cada página leída.
+    """
     path = Path(path)
     with fitz.open(path) as doc:
         for adapter in get_adapters():
             if adapter.detect(doc):
-                return adapter.parse(path)
+                return adapter.parse(path, progress_callback=progress_callback)
     raise UnsupportedBankError(
         f"No se reconoce el banco/ formato del archivo: {path.name}. "
         "Por ahora solo está soportado Mercantil Cuenta Corriente."

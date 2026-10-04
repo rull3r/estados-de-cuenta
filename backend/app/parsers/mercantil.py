@@ -19,6 +19,7 @@ Estructura del PDF (validada sobre 44 estados de cuenta 2023-2026):
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from pathlib import Path
 
 import fitz
@@ -181,7 +182,11 @@ class MercantilCorrienteAdapter:
 
     # ------------------------------------------------------------------ público
 
-    def parse(self, path: str | Path) -> ParseResult:
+    def parse(
+        self,
+        path: str | Path,
+        progress_callback: Callable[[int, int], None] | None = None,
+    ) -> ParseResult:
         path = Path(path)
         with fitz.open(path) as doc:
             result = ParseResult(
@@ -191,7 +196,7 @@ class MercantilCorrienteAdapter:
                 pages=doc.page_count,
                 cover=self._parse_cover(doc),
             )
-            self._parse_body(doc, result)
+            self._parse_body(doc, result, progress_callback)
         self._compute_balances(result)
         return result
 
@@ -247,7 +252,12 @@ class MercantilCorrienteAdapter:
 
     # ------------------------------------------------------------------ cuerpo
 
-    def _parse_body(self, doc: fitz.Document, result: ParseResult) -> None:
+    def _parse_body(
+        self,
+        doc: fitz.Document,
+        result: ParseResult,
+        progress_callback: Callable[[int, int], None] | None = None,
+    ) -> None:
         section = "LEDGER"
         ledger = _LedgerState(result)
         anchors_by_side: dict[str, dict[str, float]] = {}
@@ -347,6 +357,9 @@ class MercantilCorrienteAdapter:
                             pos_anchor = fresh
                         continue
                     self._handle_pos_line(line, origin, pos_anchor, result, section_pages)
+
+            if progress_callback is not None:
+                progress_callback(page_no + 1, doc.page_count)
 
         ledger.finish()
         result.section_pages = {key: sorted(set(value)) for key, value in section_pages.items()}

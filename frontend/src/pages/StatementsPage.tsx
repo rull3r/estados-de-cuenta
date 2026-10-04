@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import { Upload } from "../components/Upload";
 import { useToast } from "../components/Toast";
-import { STATUS_LABEL, moneyShort, statusClass } from "../format";
+import { STATUS_LABEL, moneyShort, progressLabel, statusClass } from "../format";
 import type { Statement } from "../types";
 
 export default function StatementsPage() {
@@ -25,7 +25,7 @@ export default function StatementsPage() {
   const processing = statements.some((statement) => statement.status === "procesando");
   useEffect(() => {
     if (!processing) return;
-    const timer = window.setInterval(() => void load(), 4000);
+    const timer = window.setInterval(() => void load(), 2500);
     return () => window.clearInterval(timer);
   }, [processing, load]);
 
@@ -73,6 +73,21 @@ export default function StatementsPage() {
                 {statement.period_start} → {statement.period_end}
               </Link>
               <div className="file">{statement.file_name}</div>
+              {statement.status === "procesando" && (
+                <div className="progress-row">
+                  <div className="progress">
+                    <div className="progress-fill" style={{ width: `${statement.progress_percent}%` }} />
+                  </div>
+                  <small className="muted">
+                    {progressLabel(
+                      statement.progress_stage,
+                      statement.progress_percent,
+                      statement.started_at,
+                      statement.queue_position,
+                    )}
+                  </small>
+                </div>
+              )}
             </div>
             <div className="mono">
               <div className="num-abono">+{moneyShort(statement.total_abono)}</div>

@@ -3,6 +3,15 @@ from app.parsers.reconcile import reconcile
 from tests.synth import make_statement
 
 
+def test_parse_file_reporta_progreso(tmp_path):
+    path = make_statement(tmp_path / "progreso.pdf")
+    seen: list[tuple[int, int]] = []
+    parse_file(path, progress_callback=lambda page, total: seen.append((page, total)))
+    assert seen
+    assert all(total == seen[-1][1] for _, total in seen)
+    assert seen[-1][0] == seen[-1][1]
+
+
 def test_estado_sintetico_cuadra(tmp_path):
     path = make_statement(tmp_path / "estado.pdf")
     result = parse_file(path)

@@ -24,6 +24,10 @@ class Statement(Base):
 
     status: Mapped[str] = mapped_column(String(20), default="procesando")
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    progress_stage: Mapped[str] = mapped_column(String(60), default="en cola")
+    progress_percent: Mapped[int] = mapped_column(Integer, default=0)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     holder: Mapped[str | None] = mapped_column(String(200), nullable=True)
     account_number: Mapped[str | None] = mapped_column(String(40), nullable=True)

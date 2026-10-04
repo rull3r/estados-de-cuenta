@@ -613,6 +613,38 @@ table.grid-table {
   white-space: nowrap;
 }
 
+.progress {
+  height: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  width: 100%;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--amber);
+  transition: width 400ms ease;
+}
+
+.queue-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.queue-progress .queue-msg {
+  color: var(--muted);
+}
+
+.progress-row {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: 320px;
+}
+
 @media (max-width: 700px) {
   .queue-item {
     grid-template-columns: 1fr;

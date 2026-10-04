@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import { progressLabel } from "../format";
 import { useToast } from "./Toast";
 
 type ItemStatus = "subiendo" | "en cola" | "CUADRA" | "DIFERENCIAS" | "REVISAR" | "duplicado" | "error";
@@ -10,6 +11,10 @@ interface UploadItem {
   status: ItemStatus;
   message?: string;
   statementId?: number;
+  progressStage?: string;
+  progressPercent?: number;
+  queuePosition?: number | null;
+  startedAt?: string | null;
 }
 
 const PENDING: ItemStatus[] = ["subiendo", "en cola"];
@@ -77,18 +82,29 @@ export function Upload({ onFinished }: { onFinished?: () => void }) {
           prev.map((item) => {
             if (!item.statementId || !PENDING.includes(item.status)) return item;
             const statement = statements.find((candidate) => candidate.id === item.statementId);
-            if (!statement || statement.status === "procesando") return { ...item, status: "en cola" };
+            if (!statement) return { ...item, status: "en cola" };
+            if (statement.status === "procesando") {
+              return {
+                ...item,
+                status: "en cola",
+                progressStage: statement.progress_stage,
+                progressPercent: statement.progress_percent,
+                queuePosition: statement.queue_position ?? null,
+                startedAt: statement.started_at,
+              };
+            }
             return {
               ...item,
               status: statement.status as ItemStatus,
               message: statement.error ?? undefined,
+              progressPercent: 100,
             };
           }),
         );
       } catch {
         /* se reintenta en el siguiente ciclo */
       }
-    }, 2500);
+    }, 1500);
     return () => window.clearInterval(timer);
   }, [pendingCount]);
 
@@ -168,7 +184,28 @@ export function Upload({ onFinished }: { onFinished?: () => void }) {
                 {item.name}
               </span>
               <span className={`badge ${badgeClass(item.status)}`}>{LABEL[item.status]}</span>
-              {item.message && <span className="queue-msg">{item.message}</span>}
+              {PENDING.includes(item.status) ? (
+                <div className="queue-progress">
+                  <div className="progress">
+                    <div
+                      className="progress-fill"
+                      style={{ width: `${item.status === "subiendo" ? 2 : item.progressPercent ?? 0}%` }}
+                    />
+                  </div>
+                  <span className="queue-msg muted">
+                    {item.status === "subiendo"
+                      ? "subiendo al servidor…"
+                      : progressLabel(
+                          item.progressStage,
+                          item.progressPercent ?? 0,
+                          item.startedAt,
+                          item.queuePosition,
+                        )}
+                  </span>
+                </div>
+              ) : (
+                <span className="queue-msg">{item.message ?? ""}</span>
+              )}
             </div>
           ))}
         </div>

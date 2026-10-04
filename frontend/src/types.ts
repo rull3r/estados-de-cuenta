@@ -49,6 +49,11 @@ export interface Statement {
   uploaded_at: string;
   status: string;
   error: string | null;
+  progress_stage: string;
+  progress_percent: number;
+  started_at: string | null;
+  finished_at: string | null;
+  queue_position?: number | null;
   holder: string | null;
   account_number: string | null;
   period_start: string | null;

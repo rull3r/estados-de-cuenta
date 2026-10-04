@@ -45,6 +45,10 @@ def test_flujo_completo_subida_parseo_y_estadisticas(tmp_path):
     assert detail["status"] == "CUADRA", detail
     assert detail["transaction_count"] == 4
     assert detail["report"]["month_name"] == "Enero"
+    assert detail["progress_percent"] == 100
+    assert detail["progress_stage"] == "listo"
+    assert detail["started_at"] is not None
+    assert detail["finished_at"] is not None
 
     operations = client.get("/api/operations", params={"statement_id": statement_id}).json()
     assert operations["total"] == 4
