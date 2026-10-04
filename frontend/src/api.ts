@@ -8,7 +8,15 @@ import type {
 } from "./types";
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(url, options);
+  let response: Response;
+  try {
+    response = await fetch(url, options);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("La operación tardó demasiado; revisa la red y reintenta");
+    }
+    throw error;
+  }
   if (!response.ok) {
     let detail = `Error ${response.status}`;
     try {
@@ -34,7 +42,13 @@ export const api = {
   upload: (file: File) => {
     const data = new FormData();
     data.append("file", file);
-    return request<Statement>("/api/statements", { method: "POST", body: data });
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 180_000);
+    return request<Statement>("/api/statements", {
+      method: "POST",
+      body: data,
+      signal: controller.signal,
+    }).finally(() => window.clearTimeout(timer));
   },
   deleteStatement: (id: number) =>
     request<void>(`/api/statements/${id}`, { method: "DELETE" }),

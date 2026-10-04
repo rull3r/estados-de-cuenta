@@ -14,7 +14,11 @@ config.ensure_dirs()
 
 engine = create_engine(
     f"sqlite:///{config.DB_PATH}",
-    connect_args={"check_same_thread": False},
+    connect_args={"check_same_thread": False, "timeout": 30},
+    pool_size=10,
+    max_overflow=20,
+    pool_timeout=60,
+    pool_pre_ping=True,
     future=True,
 )
 

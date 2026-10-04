@@ -6,6 +6,7 @@ import json
 import threading
 from dataclasses import asdict
 from datetime import date as date_cls
+from pathlib import Path
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -263,6 +264,39 @@ def process_statement(statement_id: int, path: str) -> None:
                     session.commit()
         finally:
             session.close()
+
+
+def recover_interrupted() -> int:
+    """Reencola los estados que quedaron «procesando» tras un reinicio.
+
+    Si el PDF original sigue en disco se vuelve a procesar automáticamente; si no,
+    el estado pasa a «error» con un mensaje claro para poder reintentar la subida.
+    Devuelve cuántos se reencolaron.
+    """
+    session = SessionLocal()
+    recovered = 0
+    try:
+        stale = session.scalars(select(Statement).where(Statement.status == "procesando")).all()
+        for statement in stale:
+            path = statement.source_path
+            if path and Path(path).exists():
+                threading.Thread(
+                    target=process_statement,
+                    args=(statement.id, path),
+                    daemon=True,
+                    name=f"edc-recover-{statement.id}",
+                ).start()
+                recovered += 1
+            else:
+                statement.status = "error"
+                statement.error = (
+                    "El procesamiento se interrumpió (reinicio) y no se encontró el archivo; "
+                    "vuelve a subirlo."
+                )
+        session.commit()
+    finally:
+        session.close()
+    return recovered
 
 
 def statement_to_dict(statement: Statement, *, detail: bool = False) -> dict:

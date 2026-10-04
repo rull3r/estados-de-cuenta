@@ -152,6 +152,99 @@ def test_reintento_de_archivo_con_error(tmp_path):
     assert detail["error"] is None
 
 
+def test_archivo_en_proceso_devuelve_el_mismo_estado(tmp_path):
+    from app.db import SessionLocal
+    from app.models import Statement
+
+    path = make_statement(tmp_path / "en_proceso.pdf")
+    with path.open("rb") as handle:
+        response = client.post(
+            "/api/statements", files={"file": ("en_proceso.pdf", handle, "application/pdf")}
+        )
+    statement_id = response.json()["id"]
+
+    session = SessionLocal()
+    statement = session.get(Statement, statement_id)
+    assert statement is not None
+    statement.status = "procesando"
+    session.commit()
+    session.close()
+
+    # Re-subir mientras se procesa devuelve el mismo estado (no error), para seguirlo.
+    with path.open("rb") as handle:
+        retry = client.post(
+            "/api/statements", files={"file": ("en_proceso.pdf", handle, "application/pdf")}
+        )
+    assert retry.status_code == 201
+    assert retry.json()["id"] == statement_id
+    assert retry.json()["status"] == "procesando"
+
+
+def test_estado_atascado_se_reprocesa(tmp_path):
+    from datetime import datetime, timedelta
+
+    from app.db import SessionLocal
+    from app.models import Statement
+
+    path = make_statement(tmp_path / "atascado.pdf")
+    with path.open("rb") as handle:
+        response = client.post(
+            "/api/statements", files={"file": ("atascado.pdf", handle, "application/pdf")}
+        )
+    statement_id = response.json()["id"]
+
+    session = SessionLocal()
+    statement = session.get(Statement, statement_id)
+    assert statement is not None
+    statement.status = "procesando"
+    statement.uploaded_at = datetime.utcnow() - timedelta(hours=2)
+    session.commit()
+    session.close()
+
+    with path.open("rb") as handle:
+        retry = client.post(
+            "/api/statements", files={"file": ("atascado.pdf", handle, "application/pdf")}
+        )
+    assert retry.status_code == 201
+    detail = client.get(f"/api/statements/{statement_id}").json()
+    assert detail["status"] == "CUADRA"
+
+
+def test_recover_interrupted_reencola(tmp_path):
+    import time
+
+    from app.db import SessionLocal
+    from app.models import Statement
+    from app.services.importer import recover_interrupted
+
+    path = make_statement(tmp_path / "interrumpido.pdf")
+    with path.open("rb") as handle:
+        response = client.post(
+            "/api/statements", files={"file": ("interrumpido.pdf", handle, "application/pdf")}
+        )
+    statement_id = response.json()["id"]
+
+    session = SessionLocal()
+    statement = session.get(Statement, statement_id)
+    assert statement is not None
+    statement.status = "procesando"
+    session.commit()
+    session.close()
+
+    assert recover_interrupted() >= 1
+    deadline = time.time() + 15
+    status = None
+    while time.time() < deadline:
+        session = SessionLocal()
+        current = session.get(Statement, statement_id)
+        status = current.status if current else None
+        session.close()
+        if status != "procesando":
+            break
+        time.sleep(0.2)
+    assert status == "CUADRA"
+
+
 def test_detecta_operaciones_repetidas_entre_estados(tmp_path):
     first = make_statement(tmp_path / "periodo_a.pdf")
     second = make_statement(tmp_path / "periodo_b.pdf", missing_debit=1.0)

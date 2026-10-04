@@ -31,6 +31,9 @@ Esta herramienta fue construida y validada contra **42 estados de cuenta reales
 - **Carga por lotes**: suelta o selecciona varios PDFs a la vez; se procesan en
   cola uno por uno, con estado por archivo (al céntimo / con diferencias /
   duplicado / error) y sin bloquear la base de datos.
+- **Recuperación automática**: si el servidor se reinicia a mitad de un
+  procesamiento, al arrancar reencola solo los estados pendientes; y re-subir un
+  archivo que falló lo reprocesa.
 - **Control de archivos**: rechaza lo que no sea PDF o no sea un estado de cuenta
   soportado, y avisa si el archivo ya fue cargado (hash).
 - **Detección de operaciones repetidas**: encuentra movimientos que aparecen en

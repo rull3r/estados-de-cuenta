@@ -12,11 +12,13 @@ from fastapi.staticfiles import StaticFiles
 from . import config
 from .api import meta, operations, statements, stats
 from .db import init_db
+from .services.importer import recover_interrupted
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
+    recover_interrupted()
     yield
 
 

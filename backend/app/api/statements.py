@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import fitz
@@ -20,6 +21,9 @@ from ..services.importer import process_statement, statement_to_dict
 
 router = APIRouter(prefix="/api/statements", tags=["statements"])
 
+# Si un estado lleva más de este tiempo «procesando», se considera interrumpido.
+STALE_AFTER = timedelta(minutes=30)
+
 
 def _public_statement(session: Session, statement_id: int) -> Statement:
     statement = session.get(Statement, statement_id)
@@ -28,8 +32,23 @@ def _public_statement(session: Session, statement_id: int) -> Statement:
     return statement
 
 
+def _is_stale(statement: Statement) -> bool:
+    return statement.status == "procesando" and datetime.utcnow() - statement.uploaded_at > STALE_AFTER
+
+
+def _requeue(session: Session, statement: Statement, file_name: str, path: Path, content: bytes) -> dict:
+    path.write_bytes(content)
+    statement.status = "procesando"
+    statement.error = None
+    statement.file_name = file_name
+    statement.source_path = str(path)
+    statement.uploaded_at = datetime.utcnow()
+    session.commit()
+    return statement_to_dict(statement)
+
+
 @router.post("", status_code=201)
-async def upload_statement(
+def upload_statement(
     background: BackgroundTasks,
     file: UploadFile = File(...),
     session: Session = Depends(get_session),
@@ -38,7 +57,7 @@ async def upload_statement(
     if not file_name.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Solo se aceptan archivos PDF")
 
-    content = await file.read()
+    content = file.file.read()
     if len(content) > config.MAX_UPLOAD_MB * 1024 * 1024:
         raise HTTPException(status_code=413, detail=f"El archivo supera {config.MAX_UPLOAD_MB} MB")
 
@@ -69,24 +88,17 @@ async def upload_statement(
 
     existing = session.scalar(select(Statement).where(Statement.file_hash == digest))
     if existing is not None:
-        # Si el intento anterior falló, permitir reprocesar el mismo archivo.
-        if existing.status == "error":
-            path.write_bytes(content)
-            existing.status = "procesando"
-            existing.error = None
-            existing.file_name = file_name
-            existing.source_path = str(path)
-            session.commit()
+        # Reintento si el intento anterior falló o si quedó atascado tras un reinicio.
+        if existing.status == "error" or _is_stale(existing):
+            payload = _requeue(session, existing, file_name, path, content)
             background.add_task(process_statement, existing.id, str(path))
+            return payload
+        if existing.status == "procesando":
+            # Ya está en la cola del servidor: la web lo sigue con este mismo id.
             return statement_to_dict(existing)
         raise HTTPException(
             status_code=409,
-            detail={
-                "message": "Este archivo ya fue cargado"
-                if existing.status != "procesando"
-                else "Este archivo se está procesando",
-                "statement_id": existing.id,
-            },
+            detail={"message": "Este archivo ya fue cargado", "statement_id": existing.id},
         )
 
     path.write_bytes(content)
