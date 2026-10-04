@@ -262,10 +262,7 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {[...statements]
-                  .sort((a, b) => (b.period_start ?? "").localeCompare(a.period_start ?? ""))
-                  .slice(0, 8)
-                  .map((statement) => (
+                {statements.slice(0, 8).map((statement) => (
                     <tr key={statement.id}>
                       <td>
                         <Link className="plain" to={`/estados/${statement.id}`}>

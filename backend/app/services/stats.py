@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..models import Adjustment, Operation, Statement
+from .importer import _period_iso
 
 
 def _scope(statement_id: int | None):
@@ -82,8 +85,13 @@ def summary(session: Session, statement_id: int | None = None) -> dict:
             Statement.saldo_final,
             Statement.transaction_count,
             Statement.status,
-        ).order_by(Statement.period_start)
+        )
     ).all()
+    # Serie cronológica ascendente (dd-mm-yy no se ordena como texto).
+    monthly_rows = sorted(
+        monthly_rows,
+        key=lambda row: (_period_iso(row[1]) or date.min, row[0]),
+    )
 
     return {
         "total_cargo": totals[0],

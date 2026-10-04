@@ -25,7 +25,7 @@ export default function Movements() {
   const [minAmount, setMinAmount] = useState("");
   const [maxAmount, setMaxAmount] = useState("");
   const [sort, setSort] = useState("date");
-  const [order, setOrder] = useState("asc");
+  const [order, setOrder] = useState("desc");
   const [categories, setCategories] = useState<string[]>([]);
   const notify = useToast();
 

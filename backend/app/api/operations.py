@@ -78,7 +78,7 @@ def list_operations(
     min_amount: float | None = None,
     max_amount: float | None = None,
     sort: str = Query("date", pattern="^(date|amount|description|method|category)$"),
-    order: str = Query("asc", pattern="^(asc|desc)$"),
+    order: str = Query("desc", pattern="^(asc|desc)$"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
     session: Session = Depends(get_session),
@@ -89,10 +89,11 @@ def list_operations(
     total = session.scalar(select(func.count(Operation.id)).where(*conditions)) or 0
     column = SORT_FIELDS[sort]
     ordering = column.asc() if order == "asc" else column.desc()
+    secondary = Operation.id.asc() if order == "asc" else Operation.id.desc()
     rows = session.scalars(
         select(Operation)
         .where(*conditions)
-        .order_by(ordering.nulls_last(), Operation.id.asc())
+        .order_by(ordering.nulls_last(), secondary)
         .offset((page - 1) * page_size)
         .limit(page_size)
     ).all()

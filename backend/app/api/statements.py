@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import fitz
@@ -17,7 +17,7 @@ from ..db import get_session
 from ..models import Adjustment, Statement
 from ..parsers.base import get_adapters
 from ..schemas import AdjustmentIn
-from ..services.importer import process_statement, statement_to_dict
+from ..services.importer import _period_iso, process_statement, statement_to_dict
 
 router = APIRouter(prefix="/api/statements", tags=["statements"])
 
@@ -124,9 +124,15 @@ def upload_statement(
 
 @router.get("")
 def list_statements(session: Session = Depends(get_session)) -> list[dict]:
-    statements = session.scalars(
-        select(Statement).order_by(Statement.period_start.desc(), Statement.id.desc())
-    ).all()
+    statements = list(session.scalars(select(Statement)).all())
+    # Orden natural: más reciente primero (dd-mm-yy no se puede ordenar como texto).
+    statements.sort(
+        key=lambda statement: (
+            _period_iso(statement.period_start) or date.min,
+            statement.id,
+        ),
+        reverse=True,
+    )
     waiting = sorted(
         [
             statement

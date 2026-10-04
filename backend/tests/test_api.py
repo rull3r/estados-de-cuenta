@@ -50,12 +50,18 @@ def test_flujo_completo_subida_parseo_y_estadisticas(tmp_path):
     assert detail["started_at"] is not None
     assert detail["finished_at"] is not None
 
-    operations = client.get("/api/operations", params={"statement_id": statement_id}).json()
+    operations = client.get(
+        "/api/operations", params={"statement_id": statement_id, "order": "asc"}
+    ).json()
     assert operations["total"] == 4
     first = operations["items"][0]
     assert first["method"] == "transferencia_enviada"
     assert first["counterpart"] == "Juan Perez"
     assert first["category"] == "Transferencias"
+
+    # Por defecto, lo más reciente primero
+    newest = client.get("/api/operations", params={"statement_id": statement_id}).json()
+    assert newest["items"][0]["date_iso"].endswith("2024-01-05")
 
     search = client.get("/api/operations", params={"text": "juan perez"}).json()
     assert search["total"] == 1
@@ -317,3 +323,38 @@ def test_detecta_operaciones_repetidas_entre_estados(tmp_path):
     detail = client.get(f"/api/statements/{second_id}").json()
     warnings = [issue for issue in detail["issues"] if issue["kind"] == "advertencia"]
     assert any("solapa" in issue["detail"] for issue in warnings)
+
+
+def test_estados_ordenados_por_fecha_real():
+    from app.db import SessionLocal
+    from app.models import Statement
+
+    session = SessionLocal()
+    session.add(
+        Statement(
+            bank="test",
+            file_name="diciembre.pdf",
+            file_hash="orden-dic",
+            status="CUADRA",
+            period_start="31-12-25",
+            period_end="31-12-25",
+        )
+    )
+    session.add(
+        Statement(
+            bank="test",
+            file_name="enero.pdf",
+            file_hash="orden-ene",
+            status="CUADRA",
+            period_start="01-01-26",
+            period_end="31-01-26",
+        )
+    )
+    session.commit()
+    session.close()
+
+    statements = client.get("/api/statements").json()
+    names = [statement["file_name"] for statement in statements]
+    # Enero 2026 debe ir antes que diciembre 2025 (más reciente primero)
+    assert names.index("enero.pdf") < names.index("diciembre.pdf")
+    assert statements[0]["period_start_iso"] is not None

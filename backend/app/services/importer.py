@@ -337,6 +337,8 @@ def recover_interrupted() -> int:
 def statement_to_dict(
     statement: Statement, *, detail: bool = False, queue_position: int | None = None
 ) -> dict:
+    start_iso = _period_iso(statement.period_start)
+    end_iso = _period_iso(statement.period_end)
     payload = {
         "id": statement.id,
         "bank": statement.bank,
@@ -354,6 +356,8 @@ def statement_to_dict(
         "account_number": statement.account_number,
         "period_start": statement.period_start,
         "period_end": statement.period_end,
+        "period_start_iso": start_iso.isoformat() if start_iso else None,
+        "period_end_iso": end_iso.isoformat() if end_iso else None,
         "saldo_inicio": statement.saldo_inicio,
         "saldo_final": statement.saldo_final,
         "total_cargo": statement.total_cargo,

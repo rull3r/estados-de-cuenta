@@ -58,6 +58,8 @@ export interface Statement {
   account_number: string | null;
   period_start: string | null;
   period_end: string | null;
+  period_start_iso?: string | null;
+  period_end_iso?: string | null;
   saldo_inicio: number | null;
   saldo_final: number | null;
   total_cargo: number;
