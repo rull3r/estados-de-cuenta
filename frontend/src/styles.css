@@ -233,6 +233,138 @@ a {
   font-size: 11px;
 }
 
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.panel-head .panel-title {
+  margin: 0;
+}
+
+.scope-field {
+  min-width: 340px;
+}
+
+.delta {
+  font-size: 10px;
+  margin-top: 4px;
+  letter-spacing: 0.04em;
+}
+
+.delta.good {
+  color: var(--ok);
+}
+
+.delta.bad {
+  color: var(--danger);
+}
+
+.legend {
+  display: flex;
+  gap: 14px;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  display: inline-block;
+}
+
+.swatch.cargo {
+  background: #ff6b5a;
+}
+
+.swatch.abono {
+  background: #9ad98f;
+}
+
+.swatch.saldo {
+  background: #7fc8be;
+}
+
+.flow {
+  width: 100%;
+  height: 250px;
+}
+
+.flow text {
+  font-size: 9px;
+  fill: var(--muted);
+  font-family: var(--mono);
+}
+
+.donut-wrap {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.donut {
+  width: 180px;
+  height: 180px;
+  flex: 0 0 auto;
+}
+
+.donut-total {
+  fill: var(--amber);
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.donut-sub {
+  fill: var(--muted);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.donut-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  min-width: 190px;
+}
+
+.donut-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.donut-legend .dot {
+  width: 9px;
+  height: 9px;
+  display: inline-block;
+}
+
+.donut-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .muted {
   color: var(--muted);
 }

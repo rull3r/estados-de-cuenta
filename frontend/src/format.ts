@@ -20,6 +20,41 @@ export function dateLabel(iso: string | null | undefined): string {
   return `${day}/${month}/${year.slice(2)}`;
 }
 
+const MONTHS_ES = [
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
+];
+
+export function monthName(period: string | null | undefined): string {
+  if (!period) return "—";
+  const parts = period.split("-");
+  if (parts.length !== 3) return period;
+  const month = Number(parts[1]);
+  const year = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
+  return `${MONTHS_ES[month - 1] ?? parts[1]} ${year}`;
+}
+
+export function monthShort(period: string | null | undefined): string {
+  const full = monthName(period);
+  return full.length > 3 ? full.slice(0, 3) : full;
+}
+
+export function dayMonthLabel(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const parts = iso.split("-");
+  return parts.length === 3 ? `${parts[2]}/${parts[1]}` : iso;
+}
+
 export const STATUS_LABEL: Record<string, string> = {
   CUADRA: "cuadra al céntimo",
   DIFERENCIAS: "con diferencias",

@@ -93,6 +93,120 @@ def summary(session: Session, statement_id: int | None = None) -> dict:
         key=lambda row: (_period_iso(row[1]) or date.min, row[0]),
     )
 
+    # --- flujo por día (con saldo de cierre de cada día) ---
+    by_day_rows = session.execute(
+        select(
+            Operation.date_iso,
+            func.coalesce(func.sum(Operation.cargo), 0.0),
+            func.coalesce(func.sum(Operation.abono), 0.0),
+            func.count(Operation.id),
+        )
+        .where(where, Operation.date_iso.is_not(None))
+        .group_by(Operation.date_iso)
+        .order_by(Operation.date_iso)
+    ).all()
+    day_balances: dict = {}
+    for date_iso, balance in session.execute(
+        select(Operation.date_iso, Operation.balance_computed)
+        .where(where, Operation.date_iso.is_not(None), Operation.balance_computed.is_not(None))
+        .order_by(Operation.date_iso, Operation.statement_id, Operation.seq)
+    ).all():
+        day_balances[date_iso] = balance
+    by_day = [
+        {
+            "date": row[0].isoformat() if row[0] else None,
+            "cargo": row[1],
+            "abono": row[2],
+            "count": row[3],
+            "balance": day_balances.get(row[0]),
+        }
+        for row in by_day_rows
+    ]
+
+    # --- costos bancarios (comisiones, mantenimiento, impuestos) ---
+    cost_methods = (
+        "comision",
+        "comision_pago_movil",
+        "comision_credito_inmediato",
+        "mantenimiento",
+        "emision_estado",
+        "mensajeria",
+        "impuesto",
+    )
+    cost_rows = session.execute(
+        select(Operation.method, func.coalesce(func.sum(Operation.cargo), 0.0))
+        .where(where, Operation.method.in_(cost_methods))
+        .group_by(Operation.method)
+        .order_by(func.sum(Operation.cargo).desc())
+    ).all()
+    bank_costs = {
+        "total": round(sum(value for _, value in cost_rows) + totals[2], 2),
+        "items": [{"label": method, "value": value} for method, value in cost_rows],
+        "igtf": totals[2],
+    }
+
+    # --- promedios y extremos ---
+    averages = session.execute(
+        select(
+            func.coalesce(func.avg(Operation.amount), 0.0),
+            func.coalesce(func.max(Operation.cargo), 0.0),
+            func.coalesce(func.max(Operation.abono), 0.0),
+            func.count(func.distinct(Operation.date_iso)),
+        ).where(where)
+    ).one()
+    active_days = averages[3] or 0
+    averages_payload = {
+        "ticket": round(averages[0], 2),
+        "max_cargo": averages[1],
+        "max_abono": averages[2],
+        "days": active_days,
+        "daily_cargo": round(totals[0] / active_days, 2) if active_days else 0.0,
+        "daily_abono": round(totals[1] / active_days, 2) if active_days else 0.0,
+    }
+
+    # --- comportamiento por día de la semana ---
+    weekday_rows = session.execute(
+        select(
+            func.strftime("%w", Operation.date_iso),
+            func.coalesce(func.sum(Operation.cargo), 0.0),
+            func.coalesce(func.sum(Operation.abono), 0.0),
+            func.count(Operation.id),
+        )
+        .where(where, Operation.date_iso.is_not(None))
+        .group_by(func.strftime("%w", Operation.date_iso))
+    ).all()
+    weekday_names = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
+    by_weekday = [
+        {
+            "label": weekday_names[int(row[0])] if row[0] is not None else "?",
+            "cargo": row[1],
+            "abono": row[2],
+            "count": row[3],
+        }
+        for row in sorted(weekday_rows, key=lambda row: row[0] or "0")
+    ]
+
+    # --- días con más gasto ---
+    top_day_rows = session.execute(
+        select(
+            Operation.date_iso,
+            func.coalesce(func.sum(Operation.cargo), 0.0),
+            func.count(Operation.id),
+        )
+        .where(where, Operation.date_iso.is_not(None))
+        .group_by(Operation.date_iso)
+        .order_by(func.sum(Operation.cargo).desc())
+        .limit(5)
+    ).all()
+    top_days = [
+        {
+            "date": row[0].isoformat() if row[0] else None,
+            "cargo": row[1],
+            "count": row[2],
+        }
+        for row in top_day_rows
+    ]
+
     return {
         "total_cargo": totals[0],
         "total_abono": totals[1],
@@ -104,6 +218,11 @@ def summary(session: Session, statement_id: int | None = None) -> dict:
         "top_counterparts": tops(Operation.counterpart),
         "top_concepts": tops(Operation.concept),
         "adjustments": {"cargo": adjustments[0], "abono": adjustments[1]},
+        "by_day": by_day,
+        "bank_costs": bank_costs,
+        "averages": averages_payload,
+        "by_weekday": by_weekday,
+        "top_days": top_days,
         "monthly": [
             {
                 "statement_id": row[0],

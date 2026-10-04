@@ -52,6 +52,10 @@ Esta herramienta fue construida y validada contra **42 estados de cuenta reales
   montos y fechas.
 - **Estadísticas**: abonos/cargos/neto, evolución de saldo, top contrapartes,
   conceptos, métodos de pago, categorías y mayores movimientos.
+- **Panel contable**: tasa de ahorro, costos bancarios (comisiones, mantenimiento
+  e IGTF), ticket promedio, promedio diario, flujo diario/mensual con saldo de
+  cierre, comportamiento por día de la semana, días con más gasto y dona de
+  categorías. Todo respeta el filtro de período seleccionado.
 - **Enriquecimiento** de cada operación: contraparte, cuenta y banco destino,
   referencia, concepto, teléfono y fecha/hora de la operación.
 - **Reprocesar**: vuelve a leer un estado con el motor de extracción actualizado

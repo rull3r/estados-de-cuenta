@@ -130,6 +130,42 @@ export interface MonthlyStat {
   status: string;
 }
 
+export interface DayStat {
+  date: string;
+  cargo: number;
+  abono: number;
+  count: number;
+  balance: number | null;
+}
+
+export interface WeekdayStat {
+  label: string;
+  cargo: number;
+  abono: number;
+  count: number;
+}
+
+export interface TopDay {
+  date: string;
+  cargo: number;
+  count: number;
+}
+
+export interface BankCosts {
+  total: number;
+  igtf: number;
+  items: { label: string; value: number }[];
+}
+
+export interface Averages {
+  ticket: number;
+  max_cargo: number;
+  max_abono: number;
+  days: number;
+  daily_cargo: number;
+  daily_abono: number;
+}
+
 export interface Summary {
   total_cargo: number;
   total_abono: number;
@@ -141,6 +177,11 @@ export interface Summary {
   top_counterparts: { cargo: TopStat[]; abono: TopStat[] };
   top_concepts: { cargo: TopStat[]; abono: TopStat[] };
   adjustments: { cargo: number; abono: number };
+  by_day: DayStat[];
+  bank_costs: BankCosts;
+  averages: Averages;
+  by_weekday: WeekdayStat[];
+  top_days: TopDay[];
   monthly: MonthlyStat[];
 }
 
