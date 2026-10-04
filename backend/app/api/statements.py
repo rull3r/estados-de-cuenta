@@ -126,6 +126,26 @@ def list_statements(session: Session = Depends(get_session)) -> list[dict]:
     return [statement_to_dict(statement) for statement in statements]
 
 
+@router.post("/reprocess-all")
+def reprocess_all(background: BackgroundTasks, session: Session = Depends(get_session)) -> dict:
+    """Vuelve a leer todos los estados cargados con el motor de extracción actual."""
+    statements = session.scalars(select(Statement).where(Statement.status != "procesando")).all()
+    queued: list[Statement] = []
+    skipped = 0
+    for statement in statements:
+        if statement.source_path and Path(statement.source_path).exists():
+            statement.status = "procesando"
+            statement.error = None
+            queued.append(statement)
+        else:
+            skipped += 1
+    session.commit()
+    for statement in queued:
+        assert statement.source_path is not None
+        background.add_task(process_statement, statement.id, statement.source_path)
+    return {"queued": len(queued), "skipped": skipped}
+
+
 @router.get("/{statement_id}")
 def get_statement(statement_id: int, session: Session = Depends(get_session)) -> dict:
     return statement_to_dict(_public_statement(session, statement_id), detail=True)

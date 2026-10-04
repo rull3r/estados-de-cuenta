@@ -278,6 +278,19 @@ def test_reprocesar_estado_rellena_campos(tmp_path):
     assert any(item["counterpart"] == "Juan Perez" for item in operations["items"])
 
 
+def test_reprocesar_todos(tmp_path):
+    path = make_statement(tmp_path / "todos.pdf")
+    with path.open("rb") as handle:
+        client.post("/api/statements", files={"file": ("todos.pdf", handle, "application/pdf")})
+
+    response = client.post("/api/statements/reprocess-all")
+    assert response.status_code == 200
+    assert response.json()["queued"] >= 1
+
+    statements = client.get("/api/statements").json()
+    assert all(statement["status"] != "procesando" for statement in statements)
+
+
 def test_detecta_operaciones_repetidas_entre_estados(tmp_path):
     first = make_statement(tmp_path / "periodo_a.pdf")
     second = make_statement(tmp_path / "periodo_b.pdf", missing_debit=1.0)

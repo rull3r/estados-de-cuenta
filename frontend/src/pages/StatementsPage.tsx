@@ -37,7 +37,26 @@ export default function StatementsPage() {
       </div>
 
       <div className="panel">
-        <h2 className="panel-title">estados cargados</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+          <h2 className="panel-title">estados cargados</h2>
+          {statements.length > 0 && (
+            <button
+              className="btn"
+              disabled={processing}
+              onClick={async () => {
+                try {
+                  const result = await api.reprocessAll();
+                  notify(`Releyendo ${result.queued} estado(s) con el motor actualizado…`);
+                  await load();
+                } catch (error) {
+                  notify(error instanceof Error ? error.message : "No se pudo reprocesar", "error");
+                }
+              }}
+            >
+              reprocesar todos
+            </button>
+          )}
+        </div>
         {statements.length === 0 && <p className="muted">Aún no hay estados de cuenta.</p>}
         {statements.map((statement) => (
           <div className="statement-row" key={statement.id}>
