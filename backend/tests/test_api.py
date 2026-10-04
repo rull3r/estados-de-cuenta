@@ -245,6 +245,39 @@ def test_recover_interrupted_reencola(tmp_path):
     assert status == "CUADRA"
 
 
+def test_reprocesar_estado_rellena_campos(tmp_path):
+    from sqlalchemy import select
+
+    from app.db import SessionLocal
+    from app.models import Operation
+
+    path = make_statement(tmp_path / "reproceso.pdf")
+    with path.open("rb") as handle:
+        response = client.post(
+            "/api/statements", files={"file": ("reproceso.pdf", handle, "application/pdf")}
+        )
+    statement_id = response.json()["id"]
+
+    # Simula datos enriquecidos de una versión anterior del motor
+    session = SessionLocal()
+    operation = session.scalars(
+        select(Operation).where(Operation.statement_id == statement_id)
+    ).first()
+    assert operation is not None
+    operation.counterpart = None
+    operation.counterpart_bank = None
+    session.commit()
+    session.close()
+
+    reprocess = client.post(f"/api/statements/{statement_id}/reprocess")
+    assert reprocess.status_code == 200
+    detail = client.get(f"/api/statements/{statement_id}").json()
+    assert detail["status"] == "CUADRA"
+
+    operations = client.get("/api/operations", params={"statement_id": statement_id}).json()
+    assert any(item["counterpart"] == "Juan Perez" for item in operations["items"])
+
+
 def test_detecta_operaciones_repetidas_entre_estados(tmp_path):
     first = make_statement(tmp_path / "periodo_a.pdf")
     second = make_statement(tmp_path / "periodo_b.pdf", missing_debit=1.0)

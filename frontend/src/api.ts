@@ -52,6 +52,8 @@ export const api = {
   },
   deleteStatement: (id: number) =>
     request<void>(`/api/statements/${id}`, { method: "DELETE" }),
+  reprocessStatement: (id: number) =>
+    request<Statement>(`/api/statements/${id}/reprocess`, { method: "POST" }),
   addAdjustment: (
     id: number,
     payload: { date: string; description: string; amount: number; direction: string; note?: string },

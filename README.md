@@ -51,6 +51,8 @@ Esta herramienta fue construida y validada contra **42 estados de cuenta reales
   conceptos, métodos de pago, categorías y mayores movimientos.
 - **Enriquecimiento** de cada operación: contraparte, cuenta y banco destino,
   referencia, concepto, teléfono y fecha/hora de la operación.
+- **Reprocesar**: vuelve a leer un estado con el motor de extracción actualizado
+  sin tener que subir el archivo otra vez (botón «reprocesar PDF»).
 - **Categorías configurables** por reglas de texto.
 - **Exportación a CSV** de cualquier búsqueda.
 - **100 % local**: los PDFs se procesan en tu equipo y la base de datos es un

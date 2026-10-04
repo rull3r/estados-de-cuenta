@@ -4,6 +4,12 @@ import { useToast } from "../components/Toast";
 import { METHOD_LABEL, dateLabel, methodLabel, money } from "../format";
 import type { Operation, OperationPage, Statement } from "../types";
 
+function timeLabel(occurredAt: string | null): string {
+  if (!occurredAt) return "";
+  const parts = occurredAt.split(" ");
+  return parts.length > 1 ? parts[1] : "";
+}
+
 export default function Movements() {
   const [statements, setStatements] = useState<Statement[]>([]);
   const [data, setData] = useState<OperationPage | null>(null);
@@ -182,7 +188,10 @@ export default function Movements() {
                 >
                   fecha {sort === "date" ? (order === "asc" ? "↑" : "↓") : ""}
                 </th>
+                <th>hora</th>
                 <th>descripción</th>
+                <th>contraparte</th>
+                <th>banco</th>
                 <th>método</th>
                 <th>categoría</th>
                 <th className="num">cargo</th>
@@ -203,14 +212,21 @@ export default function Movements() {
               {data?.items.map((operation) => (
                 <tr key={operation.id} onClick={() => setSelected(operation)} style={{ cursor: "pointer" }}>
                   <td className="mono">{dateLabel(operation.date_iso)}</td>
+                  <td className="mono">{timeLabel(operation.occurred_at)}</td>
                   <td className="desc">
                     {operation.description}
                     <small>
-                      {operation.counterpart ? ` · ${operation.counterpart}` : ""}
-                      {operation.counterpart_account ? ` ***${operation.counterpart_account}` : ""}
                       {operation.reference ? ` · ref ${operation.reference}` : ""}
+                      {operation.concept ? ` · ${operation.concept}` : ""}
                     </small>
                   </td>
+                  <td>
+                    {operation.counterpart ?? ""}
+                    {operation.counterpart_account ? (
+                      <small className="muted"> ***{operation.counterpart_account}</small>
+                    ) : null}
+                  </td>
+                  <td>{operation.counterpart_bank ?? ""}</td>
                   <td>{methodLabel(operation.method)}</td>
                   <td>{operation.category}</td>
                   <td className="num num-cargo">{operation.cargo ? money(operation.cargo) : ""}</td>
@@ -220,7 +236,7 @@ export default function Movements() {
               ))}
               {data && data.items.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="muted">
+                  <td colSpan={10} className="muted">
                     Nada coincide con los filtros.
                   </td>
                 </tr>

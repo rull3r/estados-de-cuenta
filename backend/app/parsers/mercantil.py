@@ -119,7 +119,8 @@ class _LedgerState:
             return
         description = _join_parts(self.parts)
         self.current.description = description
-        fields = enrich.enrich_operation(description)
+        direction = "abono" if self.current.abono else "cargo"
+        fields = enrich.enrich_operation(description, direction=direction)
         for key, value in fields.items():
             setattr(self.current, key, value)
         self.result.operations.append(self.current)

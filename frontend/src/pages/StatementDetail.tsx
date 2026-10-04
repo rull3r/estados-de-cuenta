@@ -295,17 +295,34 @@ export default function StatementDetail() {
           <Link className="btn" to="/estados">
             ◀ volver
           </Link>
-          <button
-            className="btn danger"
-            onClick={async () => {
-              if (!window.confirm("¿Eliminar este estado de cuenta y todos sus movimientos?")) return;
-              await api.deleteStatement(statement.id);
-              notify("Estado de cuenta eliminado.");
-              navigate("/estados");
-            }}
-          >
-            eliminar estado
-          </button>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <button
+              className="btn"
+              disabled={statement.status === "procesando"}
+              onClick={async () => {
+                try {
+                  await api.reprocessStatement(statement.id);
+                  notify("Releyendo el PDF con el motor de extracción actual…");
+                  await load();
+                } catch (error) {
+                  notify(error instanceof Error ? error.message : "No se pudo reprocesar", "error");
+                }
+              }}
+            >
+              reprocesar PDF
+            </button>
+            <button
+              className="btn danger"
+              onClick={async () => {
+                if (!window.confirm("¿Eliminar este estado de cuenta y todos sus movimientos?")) return;
+                await api.deleteStatement(statement.id);
+                notify("Estado de cuenta eliminado.");
+                navigate("/estados");
+              }}
+            >
+              eliminar estado
+            </button>
+          </div>
         </div>
       </div>
     </>

@@ -185,3 +185,25 @@ def delete_adjustment(
 def get_report(statement_id: int, session: Session = Depends(get_session)) -> dict:
     statement = _public_statement(session, statement_id)
     return json.loads(statement.report_json) if statement.report_json else {}
+
+
+@router.post("/{statement_id}/reprocess")
+def reprocess_statement(
+    statement_id: int,
+    background: BackgroundTasks,
+    session: Session = Depends(get_session),
+) -> dict:
+    """Vuelve a leer el PDF original (útil tras mejorar el motor de extracción)."""
+    statement = _public_statement(session, statement_id)
+    if not statement.source_path or not Path(statement.source_path).exists():
+        raise HTTPException(
+            status_code=409,
+            detail="No se encontró el PDF original en el servidor; vuelve a subirlo.",
+        )
+    if statement.status == "procesando":
+        return statement_to_dict(statement)
+    statement.status = "procesando"
+    statement.error = None
+    session.commit()
+    background.add_task(process_statement, statement.id, statement.source_path)
+    return statement_to_dict(statement)
