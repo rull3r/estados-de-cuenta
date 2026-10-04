@@ -36,3 +36,23 @@ def test_join_parts_une_cortes_duros_sin_espacio():
         ("REALIZADA", False),
     ]
     assert _join_parts(parts) == "TRANSFERENCIA DESDE LA CUENTA DE JUAN PEREZ POR BS. 1,000.00 REALIZADA"
+
+
+def test_join_parts_repara_artefactos_sin_inventar():
+    parts = [
+        ("TRANSFERENCIA DESDE LA CUENTA ***7307 POR CONCEPTO DE P", True),
+        ("EL 02-01-26 A LAS 22:32:33 HORAS", False),
+    ]
+    out = _join_parts(parts)
+    assert "CONCEPTO DE P EL 02-01-26" in out
+
+    parts2 = [
+        ("REALIZADA EN MERCANTIL PERSONAS", True),
+        ("EL 01/09/2024 A LAS15:07 PM POR CONCEPTO DE pago", False),
+    ]
+    out2 = _join_parts(parts2)
+    assert "PERSONAS EL 01/09/2024" in out2
+    assert "A LAS 15:07" in out2
+
+    parts3 = [("OPERACION DE CREDITO INMEDIATO - TRANSF. RECI", True), ("DE LA CCE", False)]
+    assert "TRANSF. RECI DE LA CCE" in _join_parts(parts3)

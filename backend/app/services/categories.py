@@ -16,6 +16,7 @@ DEFAULT_CATEGORIES: dict[str, str] = {
     "pago_servicios": "Servicios",
     "mantenimiento": "Cargos bancarios",
     "emision_estado": "Cargos bancarios",
+    "mensajeria": "Cargos bancarios",
     "impuesto": "Impuestos",
     "cheque": "Cheques",
     "otro": "Otros",

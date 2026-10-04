@@ -115,6 +115,41 @@ def test_pago_2023_con_nombre_y_factura():
     assert fields["concept"] == "Adrian"
 
 
+def test_formato_2024_minusculas_y_cuatro_asteriscos():
+    desc = (
+        "TRANSFERENCIA DESDE LA CUENTA ***7307 A LA CUENTA DE Adriana Borges ***3565 "
+        "POR BS. 120.00 REALIZADA EN MERCANTIL EN LINEA PERSONAS EL 11/09/2024 A LAS 11:31 AM "
+        "POR CONCEPTO DE FVG EL 11-09-24 A LAS 11:31:00 HORAS"
+    )
+    fields = enrich_operation(desc, direction="cargo")
+    assert fields["counterpart"] == "Adriana Borges"
+    assert fields["counterpart_account"] == "3565"
+    assert fields["counterpart_bank"] == "Mercantil"
+    assert fields["concept"] == "FVG"
+
+
+def test_recibida_cuenta_corriente_cuatro_asteriscos():
+    desc = (
+        "TRANSFERENCIA RECIBIDA DESDE LA CUENTA CORRIENTE ****001056483792 POR BS. 1,596.80 "
+        "REALIZADA EN MERCANTIL PERSONAS EL 01/09/2024 A LAS 15:07 PM "
+        "POR CONCEPTO DE TRANSFERENCIA EL 01-09-24 A LAS 15:07:10 HORAS"
+    )
+    fields = enrich_operation(desc, direction="abono")
+    assert fields["counterpart_account"] == "001056483792"
+    assert fields["counterpart_bank"] == "Mercantil"
+    assert fields["occurred_at"] == "01-09-24 15:07:10"
+
+
+def test_banco_explicito_tiene_prioridad_sobre_plataforma():
+    desc = (
+        "PAGO MOVIL A UN MOVIL VIA APP ENVIADO EL 05/01/2026 A LAS 10:07:52PM, "
+        "AL 0424-8473917 EN BANCO NACIONAL DE CR, CON REFERENCIA 082553010684 "
+        "REALIZADA EN MERCANTIL EN LINEA PERSONAS EL 05-01-26 A LAS 22:07:52 HORAS"
+    )
+    fields = enrich_operation(desc, direction="cargo")
+    assert fields["counterpart_bank"] == "Banco Nacional De Cr"
+
+
 def test_envio_de_pago_extrae_nombre():
     desc = (
         "RECEPCION DE PAGO EL 06/04/2026 A LAS 10:58:35AM ENVIADO POR JESUS DIAZ "

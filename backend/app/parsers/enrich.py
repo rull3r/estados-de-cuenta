@@ -48,6 +48,7 @@ _METHOD_RULES: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"TRANSFERENCIA POR INTERNET|TRANFERENCIA"), "transferencia"),
     (re.compile(r"PAGO AUTORIZADO A LA EMPRESA"), "pago_servicios"),
     (re.compile(r"PAGO DE SERVICIO"), "pago_servicios"),
+    (re.compile(r"MENSUALIDAD MENSAJERIA"), "mensajeria"),
     (re.compile(r"CONSUMO PUNTO DE VENTA"), "punto_de_venta"),
     (re.compile(r"CONSUMO TARJETA"), "tarjeta_debito"),
     (re.compile(r"PAGO A TERCEROS VIA INTERNET"), "pago_terceros"),
@@ -60,12 +61,14 @@ _METHOD_RULES: list[tuple[re.Pattern[str], str]] = [
 ]
 
 _RE_COUNTERPART = re.compile(
-    r"(?:CUENTA DE|ENTA DE)\s+([A-ZÁÉÍÓÚÑ0-9][A-ZÁÉÍÓÚÑ0-9 .,&'\-]{1,60}?)\s*\*\*\*(\d+)"
+    r"(?:CUENTA DE|ENTA DE)\s+"
+    r"([A-Za-zÁÉÍÓÚÑáéíóúñ0-9][A-Za-zÁÉÍÓÚÑáéíóúñ0-9 .,&'´’\-]{1,60}?)\s*\*{3,6}(\d+)"
 )
 _RE_COUNTERPART_ALT = re.compile(
-    r"\*\*\*(\d+)\s+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ .,'\-]{2,50}?)(?:\s+POR|\s+EL|$)"
+    r"\*{3,6}(\d+)\s+"
+    r"([A-Za-zÁÉÍÓÚÑáéíóúñ][A-Za-zÁÉÍÓÚÑáéíóúñ .,'´’\-]{2,50}?)(?:\s+POR|\s+EL|$)"
 )
-_RE_RECEIVED_FROM = re.compile(r"RECIBIDA DESDE LA CUENTA\s+\*\*\*(\d+)")
+_RE_RECEIVED_FROM = re.compile(r"RECIBIDA DESDE LA CUENTA(?:\s+CORRIENTE)?\s+\*{3,6}(\d+)")
 _RE_ORDENADA = re.compile(
     r"ORDENADA POR\s+(?:[VEJ]?\d{5,10})\s+"
     r"([A-Za-zÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑ .,'\-]{2,60}?)\s+"
@@ -98,6 +101,8 @@ _RE_PHONE = re.compile(r"\b0(4\d{2})[-\s]?(\d{7})\b")
 _BANK_START = r"(?:BANCO|BANESCO|BBVA|BNC|BANCAMIGA|BANPLUS|MERCANTIL)"
 _RE_BANK = re.compile(rf"(?:EN|DE)\s+({_BANK_START}[A-ZÁÉÍÓÚÑ0-9 .,'&-]{{2,70}})")
 _BANK_STOP = re.compile(r"\s+(?:POR|CON|EL|A/N|A LA|BAJO|DESDE|PARA)\s+.*$", re.IGNORECASE)
+_PLATFORM_BANK = re.compile(r"EN LINEA|MERCANTIL PERSONAS", re.IGNORECASE)
+_PLATFORM_MERCANTIL = re.compile(r"MERCANTIL EN LINEA|MERCANTIL PERSONAS")
 _PLACEHOLDER_NAMES = re.compile(r"^(?:N/?A|NOMBRE-BENEFICIARIO(?:-TPG)?|BENEFICIARIO)$", re.IGNORECASE)
 
 
@@ -216,9 +221,16 @@ def enrich_operation(description: str, direction: str | None = None) -> dict[str
             result["counterpart_account"] = match.group(1)
 
     # --- banco contraparte ---
-    match = _RE_BANK.search(description)
-    if match:
-        result["counterpart_bank"] = _clean_bank(match.group(1))
+    bank: str | None = None
+    for match in _RE_BANK.finditer(description):
+        candidate = _clean_bank(match.group(1))
+        if candidate and not _PLATFORM_BANK.search(candidate):
+            bank = candidate
+            break
+    if bank is None and _PLATFORM_MERCANTIL.search(description.upper()):
+        # Sin otro banco mencionado: la operación se hizo por Mercantil.
+        bank = "Mercantil"
+    result["counterpart_bank"] = bank
 
     # --- referencia ---
     match = _RE_REFERENCE.search(description)

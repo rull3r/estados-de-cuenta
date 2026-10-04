@@ -58,6 +58,31 @@ _AMOUNT_ROW_LABELS = {
 }
 
 
+_REPAIRS: list[tuple[re.Pattern[str], str]] = [
+    # Cortes duros que pegaron el timestamp al texto anterior: "...DE P" + "EL 02-01-26"
+    (re.compile(r"(?<=[A-Za-z0-9/])(P?EL \d{2}-\d{2}-\d{2} A LAS)"), r" \1"),
+    # Timestamp con año completo pegado a la palabra anterior: "...PERSONASEL 01/09/2024 A LAS"
+    (re.compile(r"(?<=[A-Za-zÁÉÍÓÚÑ])(EL \d{2}/\d{2}/\d{4} A LAS)"), r" \1"),
+    # "A LAS15:07" -> "A LAS 15:07"
+    (re.compile(r"(?<=A LAS)(?=\d)"), " "),
+    # Palabras conocidas pegadas por el corte de columna
+    (re.compile(r"(?<=REALIZADA)(?=EN\b)"), " "),
+    (re.compile(r"(?<=PERSONAS)(?=EL\b)"), " "),
+    (re.compile(r"(?<=MERCANTIL)(?=EN\b)"), " "),
+    # Abreviatura del banco partida por la columna: "TRANSF. RECI" + "DE LA CCE"
+    (re.compile(r"TRANSF\. RECIDE"), "TRANSF. RECI DE"),
+    # "HORAS" pegado a la palabra siguiente
+    (re.compile(r"(?<=HORAS)(?=[A-ZÁÉÍÓÚÑ])"), " "),
+]
+
+
+def _repair_description(text: str) -> str:
+    """Corrige artefactos de unión de líneas sin inventar contenido."""
+    for pattern, replacement in _REPAIRS:
+        text = pattern.sub(replacement, text)
+    return text
+
+
 def _join_parts(parts: list[tuple[str, bool]]) -> str:
     """Une los pedazos de una descripción respetando cortes duros de palabra."""
     if not parts:
@@ -66,7 +91,7 @@ def _join_parts(parts: list[tuple[str, bool]]) -> str:
     for index in range(1, len(parts)):
         previous_hard = parts[index - 1][1]
         out += ("" if previous_hard else " ") + parts[index][0]
-    return out
+    return _repair_description(out)
 
 
 def _is_ledger_header(words: list[str]) -> bool:
